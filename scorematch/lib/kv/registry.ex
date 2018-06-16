@@ -3,52 +3,49 @@ defmodule KV.Registry do
 
   # Client API
 
-  def start_link(manager, buckets, opts \\ []) do
-    GenServer.start_link(__MODULE__, {manager, buckets}, opts)
+  def start_link(table, manager, buckets, opts \\ []) do
+    GenServer.start_link(__MODULE__, {table, manager, buckets}, opts)
   end
 
-  def lookup(server, name) do
-    GenServer.call(server, {:lookup, name})
+  def lookup(table, name) do
+    case :ets.lookup(table, name) do
+      [{^name, bucket}] -> {:ok, bucket}
+      [] -> :error
+    end
   end
 
   def create(server, name) do
-    IO.puts("create-client")
-    GenServer.cast(server, {:create, name})
+    GenServer.call(server, {:create, name})
   end
 
-  # Server API
+  # Server Callbacks
 
-  def init({events, buckets}) do
-    names = HashDict.new()
+  def init({ets, events, buckets}) do
+    # ets = :ets.new(table, [:named_table, read_concurrency: true])
     refs = HashDict.new()
-    {:ok, %{names: names, refs: refs, events: events, buckets: buckets}}
+    {:ok, %{names: ets, refs: refs, events: events, buckets: buckets}}
   end
 
-  def handle_call({:lookup, name}, _from, state) do
-    {:reply, HashDict.fetch(state.names, name), state}
-  end
+  def handle_call({:create, name}, _from, state) do
+    case lookup(state.names, name) do
+      [:ok, pid] ->
+        {:reply, pid, state}
 
-  def handle_cast({:create, name}, state) do
-    IO.puts("create-handle")
-
-    if(HashDict.get(state.names, name)) do
-      {:reply, {state.names, state.refs}}
-    else
-      IO.puts("create-else")
-      {:ok, bucket} = KV.Bucket.Supervisor.start_bucket(state.buckets)
-      ref = Process.monitor(bucket)
-      refs = HashDict.put(state.refs, ref, name)
-      names = HashDict.put(state.names, name, bucket)
-      GenEvent.sync_notify(state.events, {:create, name, bucket})
-      {:noreply, %{state | names: names, refs: refs}}
+      :error ->
+        {:ok, bucket} = KV.Bucket.Supervisor.start_bucket(state.buckets)
+        ref = Process.monitor(bucket)
+        refs = HashDict.put(state.refs, ref, name)
+        :ets.insert(state.names, {name, bucket})
+        GenEvent.sync_notify(state.events, {:create, name, bucket})
+        {:reply, bucket, %{state | refs: refs}}
     end
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     {name, refs} = HashDict.pop(state.refs, ref)
-    names = HashDict.delete(state.names, name)
+    :ets.delete(state.names, name)
     GenEvent.sync_notify(state.events, {:exit, name, _pid})
-    {:noreply, %{state | names: names, refs: refs}}
+    {:noreply, %{state | refs: refs}}
   end
 
   def handle_info(msg, state) do
