@@ -38,19 +38,22 @@ defmodule Scorematch do
 #     KV.Bucket.put bucket, "園田ことり", "いくよFull Combo!"
 #     IO.puts KV.Bucket.get bucket, "園田ことり"
 
-    {:ok, manager} = GenEvent.start_link
-    {:ok, registry} = KV.Registry.start_link manager
-    GenEvent.add_mon_handler manager, Forwarder, self()
-    KV.Registry.create registry, "card1"
-    {:ok, bucket} = KV.Registry.lookup registry, "card1"
-    receive do
-      {:create, "card1", ^bucket} -> IO.puts "create:" <> Kernel.inspect bucket
-    end
-    Agent.stop bucket
-    receive do
-      {:exit, "card1", ^bucket} -> IO.puts "exit:" <> Kernel.inspect bucket
-    end
+#     {:ok, manager} = GenEvent.start_link
+#     {:ok, registry} = KV.Registry.start_link manager
+#     GenEvent.add_mon_handler manager, Forwarder, self()
+#     KV.Registry.create registry, "card1"
+#     {:ok, bucket} = KV.Registry.lookup registry, "card1"
+#     receive do
+#       {:create, "card1", ^bucket} -> IO.puts "create:" <> Kernel.inspect bucket
+#     end
+#     Agent.stop bucket
+#     receive do
+#       {:exit, "card1", ^bucket} -> IO.puts "exit:" <> Kernel.inspect bucket
+#     end
 
+    KV.Supervisor.start_link
+    KV.Registry.create KV.Registry, "card1"
+    IO.inspect KV.Registry.lookup KV.Registry, "card1"
   end
 
 
