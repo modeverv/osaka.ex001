@@ -1,0 +1,15 @@
+defmodule Forwarder do
+  use GenEvent
+  def handle_event event, parent do
+    send parent, event
+    {:ok, parent}
+  end
+end
+
+{:ok, manager} = GenEvent.start_link
+GenEvent.add_handler manager, Forwarder, self()
+GenEvent.sync_notify manager, "にゃ！"
+
+receive do
+  msg -> IO.inspect msg
+end

@@ -33,8 +33,6 @@ idol = "rin"     # "rin"
 # {rin, umi, nozomi} = {"hoshizora", "sonoda", "tojo", "yazawa"} 
 # {rin, umi, nozomi} = {"hoshizora", "sonoda", "tojo"}  
 
-
-
 unit = {"umi", "rin", "nozomi"}
 r = case unit do
     {"nico", "maki", "eli"} -> "BiBi"
@@ -202,3 +200,19 @@ defmodule Main do
 end
  
 Main.main
+
+pid = spawn fn -> IO.puts "ラブアロー☆シュート！" end
+
+parent = self()
+spawn fn -> send parent, {:hi, "いくよFull Combo!"} end
+receive do
+  {:hi, msg} -> IO.puts msg
+end
+
+parent = self()
+spawn fn -> send parent, {:hi, "いくよFull Combo!"} end
+receive do
+  {:hello, msg} -> IO.puts msg
+after
+  3_000 -> IO.puts "メッセージ来ないにゃ・・・"
+end
